@@ -125,11 +125,29 @@ everything. The whole attachment is read into memory to be measured, so a genero
 
 ## Delivery status
 
-| Status  | Meaning                                                              |
-|---------|----------------------------------------------------------------------|
-| Sent    | The mail transport accepted the message.                             |
-| Failed  | Sending threw an error; the error message is recorded on the record. |
-| Pending | The message was logged, but no outcome has been recorded yet.        |
+| Status  | Meaning                                                                                    |
+|---------|--------------------------------------------------------------------------------------------|
+| Sent    | The mail transport accepted the message.                                                   |
+| Failed  | Sending threw an error; the error message is recorded on the record.                       |
+| Pending | The outcome is unknown. The message was logged, but neither a send nor a failure followed. |
+
+Pending is not a transient state: the message is logged just before the transport runs and marked as sent right
+after, so a record that is still Pending after a few minutes should be treated as not sent. It stays Pending when:
+
+* the process died between logging and sending — a fatal error, a PHP timeout, a killed queue worker;
+* a `MessageSending` listener, or a `mailer.prepareSend` listener registered after the plugin, returned `false` and
+  stopped the send;
+* sending threw an exception the plugin could not attribute to the send, for example one wrapped in a custom
+  exception without the original as `previous`;
+* the application caught the exception without reporting it, so it never reached the exception handler where the
+  plugin records failures. A caught exception passed to `report()` still marks the record as Failed;
+* the message was delivered but marking the record as sent failed, for example on a lost database connection. The
+  error is written to the application log and the send is not repeated.
+
+The **Pending** filter lists such records.
+
+Logging never blocks delivery. When the log row itself cannot be written, the message is still sent, nothing is
+recorded for it, and the reason is written to the application log.
 
 > **Note:** A queued mailable is logged again on every attempt, so a message that fails twice before finally being
 > delivered leaves two failed rows plus one sent row.
@@ -137,15 +155,16 @@ everything. The whole attachment is read into memory to be measured, so a genero
 ## Resend
 
 The preview has a **Resend** button for users with the `renatio.maillog.manage_logs.resend` permission. It sends the
-stored body and subject to the original To, CC and BCC recipients, with the stored attachments where available, using
-the mail configuration currently in effect. The original sender and reply-to address are not reused.
+stored body and subject to the original To, CC and BCC recipients, with the original reply-to address and the stored
+attachments where available, using the mail configuration currently in effect. The original sender is not reused.
 
-The resent message is logged as a new record, and the original record keeps who resent it and when.
+The resent message is logged as a new record that links back to the original and names who resent it; the original
+lists every resend.
 
 ## Filters
 
 * **Template** - the mail template the message was built from
-* **Sent** / **Failed** - delivery outcome
+* **Sent** / **Failed** / **Pending** - delivery outcome
 * **Opened** - opened at least once (hidden when open tracking is off)
 * **Created at** - a date range
 
@@ -158,8 +177,9 @@ messages for the last `days` days (7 by default). The figures are cached for one
 
 ## Export
 
-The **Export** button in the list toolbar, available with the `renatio.maillog.manage_logs.export` permission, exports
-the whole log to CSV, streamed in chunks so a large log does not exhaust memory.
+The **Export all** button in the list toolbar, available with the `renatio.maillog.manage_logs.export` permission,
+exports the whole log to CSV, streamed in chunks so a large log does not exhaust memory. The rows checked and the
+filters set on the list have no effect on it.
 
 ## Permissions
 

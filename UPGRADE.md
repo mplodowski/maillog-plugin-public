@@ -1,5 +1,7 @@
 # Upgrade guide
 
+Versions not listed here need no action. Back up the database before upgrading.
+
 ## Upgrading To 2.0.0
 
 The plugin requires October CMS 4.x. If you are still running October CMS 3, stay on the 1.x branch.
@@ -51,3 +53,18 @@ loses access. The permissions also moved from the **Utilities** tab into their o
 | `utilities.mail_logs_settings`    | `renatio.maillog.manage_settings`           |
 
 If your own code calls `hasAccess()` or `userHasAccess()` with one of the old codes, update those calls.
+
+## Upgrading To 3.1.0
+
+Run `php artisan october:migrate`.
+
+A resend is now logged as a record linked to its original, carrying who resent it, and the original lists every
+resend. The `resent_at` column is dropped and the `resent_by` values held on originals are cleared, since earlier
+resends cannot be matched to their originals.
+
+## Upgrading To 3.1.1
+
+Run `php artisan october:migrate`.
+
+The `subject` and `from` columns are widened to `text`. On MySQL that rewrites the whole log table, so prune old
+records first on a large installation.

@@ -36,7 +36,8 @@ Run `php artisan october:migrate`.
 
 ## Upgrading To 3.0.0
 
-The plugin requires PHP 8.3 or newer; upgrade the runtime before running Composer.
+The plugin required PHP 8.3 or newer from 3.0.0 to 3.1.1. Since 3.1.2 it requires PHP 8.2 or newer, the same as
+October CMS 4.x itself, so no runtime upgrade is needed beyond what October CMS already demands.
 
 The permission codes changed, so run `php artisan october:migrate`. The migration rewrites existing grants, so nobody
 loses access. The permissions also moved from the **Utilities** tab into their own **Mail Logs** tab.

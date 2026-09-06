@@ -25,7 +25,7 @@ Check whether a user received an important email, or simply confirm that mail is
 
 ## Requirements
 
-This plugin requires October CMS 4.x and PHP 8.3 or newer.
+This plugin requires October CMS 4.x and PHP 8.2 or newer.
 
 If you are running October CMS 3.x or older, use the 1.x branch of this plugin.
 

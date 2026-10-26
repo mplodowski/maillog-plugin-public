@@ -7,7 +7,7 @@ resend.
 **Login:** maillog  
 **Password:** maillog
 
-Check whether a user received an important email, or simply confirm that mail is going out at all.
+Check whether an important email went out, or simply confirm that mail is going out at all.
 
 ## Features
 
@@ -18,7 +18,7 @@ Check whether a user received an important email, or simply confirm that mail is
 * Skip the body of chosen templates, so a password reset link never lands in the log
 * Open tracking
 * Mail Activity dashboard widget
-* CSV export
+* CSV and JSON export
 * Automatic pruning of old logs
 * Fine-grained permissions
 * Works out of the box
@@ -27,12 +27,12 @@ Check whether a user received an important email, or simply confirm that mail is
 
 This plugin requires October CMS 4.x and PHP 8.2 or newer.
 
-If you are running October CMS 3.x or older, use the 1.x branch of this plugin.
+If you are running October CMS 3.x or older, stay on version 1.0.6 of this plugin.
 
 ## Why is this a paid plugin?
 
 Something that is free has little or no perceived value. Users do not commit to free products and only use them until
-something else looks nice and is free comes along. When I invest my time in the development of a new plugin I commit to
+something else that looks nice and is free comes along. When I invest my time in the development of a new plugin I commit to
 supporting and maintaining it. I ask my customers to do the same. I do not make money from this plugin by
 advertisements, upgrades or additional services like hosting or setup.
 
@@ -73,6 +73,11 @@ from the queue.
 The log lives in Settings -> Logs -> Mail Logs. Click a record to open its preview, which shows the message details and
 renders the original message body.
 
+A message sent without an HTML part is stored as its plain text, which the preview shows and a resend delivers as
+preformatted HTML. The size cap is applied to that text before it is escaped, so the stored copy can come out slightly
+larger than the cap. A body supplied as a stream is not stored, since reading it would empty the message on its way
+out; the preview says so.
+
 ## Settings
 
 Settings -> Logs -> Mail Log Settings.
@@ -80,21 +85,25 @@ Settings -> Logs -> Mail Log Settings.
 ### Prune period in days
 
 Records older than this are deleted once a day by a scheduled task. The default is 30 days; `0` or empty keeps
-records forever. Logged messages hold the full mail body and the recipient IP address, so keeping them indefinitely
-should be a deliberate choice.
+records forever. Logged messages hold mail bodies and addresses, so keeping them indefinitely should be a deliberate
+choice; see [Personal data](#personal-data).
 
 > **Important note:** For scheduled tasks to operate correctly you must set up the
 > scheduler: https://docs.octobercms.com/4.x/setup/scheduler.html
 
-### Track when user opens email
+### Track when a recipient opens an email
 
 Adds an invisible image to every HTML message to record when it is opened. Enabled by default.
 
 Open tracking is a best-effort signal: many mail clients block remote images, and privacy proxies fetch them without
-the recipient reading the message. When tracking is off, the open columns and the **Opened** filter disappear from the
-list.
+the recipient reading the message. When tracking is off, opens of messages sent earlier are no longer recorded, and
+the open columns, the **Opened** filter and the **Opened** bar of the activity widget disappear.
 
-### Maximum message size in MB
+The image URL of a logged message is rate limited to 30 requests a minute, so opens fetched through mail privacy relays
+are recorded however large the send. Requests for any other address are limited to 600 a minute per IP address; behind
+a proxy or CDN, configure trusted proxies, otherwise they all share the proxy's single limit.
+
+### Maximum stored body size in MB
 
 Caps the copy of the message body kept in the log; the message itself always goes out whole. The default is 1 MB,
 `0` keeps every body in full. Templates that inline images as base64 write megabytes into the log on every send,
@@ -105,7 +114,17 @@ A truncated message cannot be resent, and the preview says so.
 ### Templates whose content is not stored
 
 Messages built from the templates named here are logged with their recipients, subject and status, but without their
-content. Use it for mail carrying a secret, such as the password reset link. Such a message cannot be resent.
+content. Use it for mail carrying a secret, such as the password reset link. This applies to plain-text messages too.
+Such a message cannot be resent.
+
+The following templates are always logged this way, whether or not they are listed, and every run of four or more
+digits in their subject is masked, so a one-time code does not reach the log either:
+
+* `backend:restore` and `backend:invite` (backend password reset and invitation)
+* `user:recover_password`, `user:invite_email` and `user:verify_email` (RainLab.User)
+* `renatio.twofactorauth::mail.code` (Renatio.TwoFactorAuth verification code)
+
+Templates added to the list get the same subject masking.
 
 ### Store attachments
 
@@ -115,6 +134,7 @@ default.
 Copies are written outside the web root, under `storage/app/uploads/protected`, and can only be downloaded by users
 with the `renatio.maillog.manage_logs.attachments` permission; everyone else sees the file names as plain text. Files
 are stored only once the mail transport has accepted the message, and images embedded with `cid:` are not stored.
+Attachments of templates whose content is not stored are not kept either; only their names are logged.
 Stored files are removed together with their log record, whether it is deleted, emptied or pruned.
 
 ### Maximum attachment size in MB
@@ -157,6 +177,10 @@ recorded for it, and the reason is written to the application log.
 The preview has a **Resend** button for users with the `renatio.maillog.manage_logs.resend` permission. It sends the
 stored body and subject to the original To, CC and BCC recipients, with the original reply-to address and the stored
 attachments where available, using the mail configuration currently in effect. The original sender is not reused.
+The button is not shown for a message whose body was not stored or was truncated.
+
+Images embedded with `cid:` (such as a logo added with `$message->embed()`) are not stored, so a resent message shows
+them as broken; the confirmation says so before anything is sent.
 
 The resent message is logged as a new record that links back to the original and names who resent it; the original
 lists every resend.
@@ -168,18 +192,22 @@ lists every resend.
 * **Opened** - opened at least once (hidden when open tracking is off)
 * **Created at** - a date range
 
-The **From** and **Last Opened** columns are hidden by default; turn them on with the list setup button.
+The **Template** filter lists the templates that appear in the log.
+
+The **From**, **Reply to**, **IP address**, **Template**, **First opened** and **Last opened** columns are hidden by
+default; turn them on with the list setup button.
 
 ## Mail Activity dashboard widget
 
-Add it on the dashboard with **Add widget** -> *Mail Activity*. It shows the total logged, sent, opened and failed
-messages for the last `days` days (7 by default). The figures are cached for one minute.
+Add it on the dashboard with **Add widget** -> *Mail Activity*. It shows the total logged, sent, opened (while open
+tracking is on) and failed messages for the last `days` days (7 by default). The figures are cached for one minute.
 
 ## Export
 
 The **Export all** button in the list toolbar, available with the `renatio.maillog.manage_logs.export` permission,
-exports the whole log to CSV, streamed in chunks so a large log does not exhaust memory. The rows checked and the
-filters set on the list have no effect on it.
+exports the whole log to JSON (the default), CSV or CSV with custom delimiters, streamed in chunks so a large log does
+not exhaust memory. The rows checked and the filters set on the list have no effect on it. The export includes message
+bodies and every address.
 
 ## Permissions
 
@@ -189,9 +217,44 @@ filters set on the list have no effect on it.
 | `renatio.maillog.manage_logs.preview`         | Opening the preview of a single logged message.          |
 | `renatio.maillog.manage_logs.delete`          | Deleting selected records from the list.                 |
 | `renatio.maillog.manage_logs.truncate`        | Emptying the whole log with the "Empty Mail Log" button. |
-| `renatio.maillog.manage_logs.export`          | Exporting the log to CSV.                                |
+| `renatio.maillog.manage_logs.export`          | Exporting the log to CSV or JSON.                        |
 | `renatio.maillog.manage_logs.resend`          | Resending a logged message from its preview.             |
 | `renatio.maillog.manage_logs.attachments`     | Downloading a stored attachment from the preview.        |
 | `renatio.maillog.manage_settings`             | Access to the Mail Log Settings page.                    |
 
 `renatio.maillog.manage_logs` is required to reach the list at all; the other permissions gate individual actions.
+
+## Personal data
+
+For every message the log stores:
+
+* the To, CC, BCC, From and Reply-To addresses, the subject and the template code;
+* the body, up to the size cap, unless its template is one whose content is not stored;
+* the attachment file names, and a copy of each attachment when **Store attachments** is on;
+* the IP address of the request that sent the mail (the visitor submitting a form, for example; `127.0.0.1` for mail
+  sent by a queue worker or from the command line);
+* the delivery status and error, and the backend user who resent it;
+* with open tracking on, the time of the first and last open and the number of opens. The IP address and client of
+  whoever opens the message are not recorded.
+
+Every logged message carries an `X-LOG-HASH` header visible to the recipient. With open tracking on, HTML messages also
+carry an image loading the public URL `/track/opened/{hash}`. Where recipients have not agreed to be tracked, turn open
+tracking off.
+
+To keep less:
+
+* set a short **Prune period in days**;
+* list every template carrying a secret under **Templates whose content is not stored**;
+* grant the export permission sparingly, since an export holds every body and address.
+
+Records can be deleted from the list, all at once with **Empty Mail Log**, or by pruning; their stored attachments go
+with them. Logged records cannot be edited.
+
+## Troubleshooting
+
+* **Opens are not recorded.** Open tracking must be on, and the message must have an HTML part. For mail sent by a
+  queue worker or from the command line the image URL is built from `APP_URL`, which must be the public address of the
+  site.
+* **Records stay Pending.** See [Delivery status](#delivery-status).
+* **Old records are not deleted.** Pruning runs from the scheduler, which must be set up; see
+  [Prune period in days](#prune-period-in-days).

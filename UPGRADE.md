@@ -2,9 +2,9 @@
 
 Versions not listed here need no action. Back up the database before upgrading.
 
-## Upgrading To 2.0.0
+## Upgrading To 2.0.1
 
-The plugin requires October CMS 4.x. If you are still running October CMS 3, stay on the 1.x branch.
+The plugin requires October CMS 4.x. If you are still running October CMS 3, stay on 1.0.6.
 
 ## Upgrading To 2.0.6
 
@@ -14,14 +14,16 @@ controller or links to that action directly.
 ## Upgrading To 2.1.0
 
 * Run `php artisan october:migrate`.
-* Grant the new `utilities.mail_logs.resend` permission to the roles that should be able to resend mail.
+* Grant the new `utilities.mail_logs.resend` permission (`renatio.maillog.manage_logs.resend` since 3.0.0) to the
+  roles that should be able to resend mail.
 * If you serve a mirrored public folder, run `php artisan october:mirror`, or the Mail Activity widget renders
   unstyled.
 
 ## Upgrading To 2.2.0
 
 Attachment storage is off by default. To use it, enable **Store attachments** in the settings and grant the new
-`utilities.mail_logs.attachments` permission to the roles that should be able to download stored files.
+`utilities.mail_logs.attachments` permission (`renatio.maillog.manage_logs.attachments` since 3.0.0) to the roles
+that should be able to download stored files.
 
 ## Upgrading To 2.3.0
 
@@ -36,11 +38,10 @@ Run `php artisan october:migrate`.
 
 ## Upgrading To 3.0.0
 
-The plugin required PHP 8.3 or newer from 3.0.0 to 3.1.1. Since 3.1.2 it requires PHP 8.2 or newer, the same as
-October CMS 4.x itself, so no runtime upgrade is needed beyond what October CMS already demands.
+Versions 3.0.0 to 3.1.1 required PHP 8.3; since 3.1.2 PHP 8.2 is enough.
 
-The permission codes changed, so run `php artisan october:migrate`. The migration rewrites existing grants, so nobody
-loses access. The permissions also moved from the **Utilities** tab into their own **Mail Logs** tab.
+Run `php artisan october:migrate`. It renames the permission codes as below and rewrites existing grants, so nobody
+loses access; the permissions now sit on their own **Mail Logs** tab.
 
 | Before                            | After                                       |
 |-----------------------------------|---------------------------------------------|
@@ -53,7 +54,7 @@ loses access. The permissions also moved from the **Utilities** tab into their o
 | `utilities.mail_logs.attachments` | `renatio.maillog.manage_logs.attachments`   |
 | `utilities.mail_logs_settings`    | `renatio.maillog.manage_settings`           |
 
-If your own code calls `hasAccess()` or `userHasAccess()` with one of the old codes, update those calls.
+Update any `hasAccess()` or `userHasAccess()` call in your own code that uses an old code.
 
 ## Upgrading To 3.1.0
 
@@ -69,3 +70,12 @@ Run `php artisan october:migrate`.
 
 The `subject` and `from` columns are widened to `text`. On MySQL that rewrites the whole log table, so prune old
 records first on a large installation.
+
+## Upgrading To 3.2.0
+
+Run `php artisan october:migrate`. The log is now read-only, so records can no longer be created or edited from the
+backend form.
+
+Password reset, invitation and verification code mail is now always logged without its body and with the digits of
+its subject masked. Entries written by earlier versions still contain these links and codes, so review or delete the
+existing log entries of the templates listed in the README, or empty the log.
